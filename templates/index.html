@@ -95,12 +95,11 @@
 
             <div class="mb-3">
                 <label class="form-label">Vehicle Type</label>
-                <select name="vehicle_type" id="vehicle_type" class="form-control">
-                   {% for v in vehicle_types %}
-                   <option value="{{ v.id }}" data-price="{{ v.price_per_hour }}">
-                   {{ v.type_name }} (₹{{ v.price_per_hour }}/hr)
-                   </option>
-                   {% endfor %}
+                <select name="vehicle_type" required>
+                  <option value="">Select Vehicle</option>
+                  <option value="1">Car</option>
+                 <option value="2">Bike</option>
+                 <option value="3">Truck</option>
                 </select>
             </div>
             <div class="mt-3">
