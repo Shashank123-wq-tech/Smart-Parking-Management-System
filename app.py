@@ -1,12 +1,11 @@
 from flask import Flask, render_template, request, redirect, session
 from datetime import datetime
 from models import get_db_connection, init_db
-from datetime import datetime
 
 app = Flask(__name__)
-app.secret_key = "secret123"
+app.secret_key = "supersecretkey"
 
-# Initialize database (creates tables)
+# Initialize DB
 init_db()
 
 
@@ -14,10 +13,12 @@ init_db()
 @app.route('/')
 def index():
     conn = get_db_connection()
+    cur = conn.cursor()
 
-    # ✅ THIS IS THE LINE YOU ASKED ABOUT
-    vehicle_types = conn.execute("SELECT * FROM vehicle_types").fetchall()
+    cur.execute("SELECT * FROM vehicle_types")
+    vehicle_types = cur.fetchall()
 
+    cur.close()
     conn.close()
 
     return render_template('index.html', vehicle_types=vehicle_types)
@@ -32,11 +33,24 @@ def register():
         password = request.form['password']
 
         conn = get_db_connection()
-        conn.execute(
-            "INSERT INTO users (name, email, password) VALUES (?, ?, ?)",
+        cur = conn.cursor()
+
+        # ✅ Check duplicate email
+        cur.execute("SELECT * FROM users WHERE email = %s", (email,))
+        existing = cur.fetchone()
+
+        if existing:
+            cur.close()
+            conn.close()
+            return "❌ Email already exists"
+
+        cur.execute(
+            "INSERT INTO users (name, email, password) VALUES (%s, %s, %s)",
             (name, email, password)
         )
+
         conn.commit()
+        cur.close()
         conn.close()
 
         return redirect('/login')
@@ -52,14 +66,20 @@ def login():
         password = request.form['password']
 
         conn = get_db_connection()
-        user = conn.execute(
-            "SELECT * FROM users WHERE email=? AND password=?",
+        cur = conn.cursor()
+
+        cur.execute(
+            "SELECT * FROM users WHERE email = %s AND password = %s",
             (email, password)
-        ).fetchone()
+        )
+
+        user = cur.fetchone()
+
+        cur.close()
         conn.close()
 
         if user:
-            session['user_id'] = user['id']
+            session['user_id'] = user[0]   # id is index 0
             return redirect('/')
         else:
             return "❌ Invalid credentials"
@@ -81,96 +101,105 @@ def book():
     if 'user_id' not in session:
         return redirect('/login')
 
-    vehicle_type = request.form['vehicle_type']
+    vehicle_type = int(request.form['vehicle_type'])
     start_time = request.form['start_time']
     end_time = request.form['end_time']
 
     conn = get_db_connection()
+    cur = conn.cursor()
 
-    # 🔥 CHECK AVAILABLE SLOT (NO TIME CONFLICT)
-    slot = conn.execute("""
+    # 🔥 Check available slot (no conflict)
+    cur.execute("""
     SELECT * FROM slots 
-    WHERE vehicle_type_id = ?
+    WHERE vehicle_type_id = %s
     AND id NOT IN (
         SELECT slot_id FROM bookings
-        WHERE (start_time < ? AND end_time > ?)
+        WHERE (start_time < %s AND end_time > %s)
     )
     LIMIT 1
-    """, (vehicle_type, end_time, start_time)).fetchone()
+    """, (vehicle_type, end_time, start_time))
+
+    slot = cur.fetchone()
 
     if not slot:
+        cur.close()
+        conn.close()
         return "❌ No parking available for this time slot"
+
+    slot_id = slot[0]
 
     # 🧮 Calculate duration
     fmt = "%Y-%m-%dT%H:%M"
     start = datetime.strptime(start_time, fmt)
     end = datetime.strptime(end_time, fmt)
 
-    hours = (end - start).seconds / 3600
+    hours = (end - start).total_seconds() / 3600
 
     if hours <= 0:
         return "❌ Invalid time selection"
 
-    # 💰 Get price per hour
-    price = conn.execute(
-        "SELECT price_per_hour FROM vehicle_types WHERE id=?",
+    # 💰 Get price
+    cur.execute(
+        "SELECT price_per_hour FROM vehicle_types WHERE id = %s",
         (vehicle_type,)
-    ).fetchone()[0]
+    )
+    price = cur.fetchone()[0]
 
     total_amount = hours * price
 
     # 💾 Insert booking
-    conn.execute("""
+    cur.execute("""
     INSERT INTO bookings 
     (user_id, slot_id, start_time, end_time, total_amount, status)
-    VALUES (?, ?, ?, ?, ?, ?)
-    """, (session['user_id'], slot['id'], start_time, end_time, total_amount, 'booked'))
+    VALUES (%s, %s, %s, %s, %s, %s)
+    """, (session['user_id'], slot_id, start, end, total_amount, 'booked'))
 
     conn.commit()
+    cur.close()
     conn.close()
 
-    return f"✅ Booking Successful! Slot {slot['id']} | Amount: ₹{total_amount}"
+    return redirect('/my_bookings')
 
 
 # ---------------- VIEW BOOKINGS ----------------
 @app.route('/my_bookings')
 def my_bookings():
 
-    # 🔒 Ensure user is logged in
     if 'user_id' not in session:
         return redirect('/login')
 
     conn = get_db_connection()
+    cur = conn.cursor()
 
-    # 📥 Fetch bookings for logged-in user only
-    bookings = conn.execute("""
-    SELECT b.id, b.start_time, b.end_time, b.total_amount, s.id as slot_id
+    cur.execute("""
+    SELECT b.id, b.start_time, b.end_time, b.total_amount, s.id
     FROM bookings b
     JOIN slots s ON b.slot_id = s.id
-    WHERE b.user_id = ?
+    WHERE b.user_id = %s
     ORDER BY b.start_time DESC
-    """, (session['user_id'],)).fetchall()
+    """, (session['user_id'],))
 
+    data = cur.fetchall()
+
+    cur.close()
     conn.close()
 
-    # 🔄 Convert and calculate status
     bookings_list = []
 
-    for b in bookings:
-        start = datetime.strptime(b['start_time'], "%Y-%m-%dT%H:%M")
-        end = datetime.strptime(b['end_time'], "%Y-%m-%dT%H:%M")
-
+    for b in data:
         bookings_list.append({
-            "id": b['id'],
-            "slot_id": b['slot_id'],
-            "start_time": b['start_time'],
-            "end_time": b['end_time'],
-            "total_amount": b['total_amount'],
-            "status": "Completed" if end < datetime.now() else "Active"
+            "id": b[0],
+            "slot_id": b[4],
+            "start_time": b[1],
+            "end_time": b[2],
+            "total_amount": b[3],
+            "status": "Completed" if b[2] < datetime.now() else "Active"
         })
 
     return render_template('bookings.html', bookings=bookings_list)
 
+
+# ---------------- CANCEL ----------------
 @app.route('/cancel/<int:booking_id>')
 def cancel_booking(booking_id):
 
@@ -178,53 +207,71 @@ def cancel_booking(booking_id):
         return redirect('/login')
 
     conn = get_db_connection()
+    cur = conn.cursor()
 
-    conn.execute("""
+    cur.execute("""
     UPDATE bookings 
     SET status = 'cancelled'
-    WHERE id = ? AND user_id = ?
+    WHERE id = %s AND user_id = %s
     """, (booking_id, session['user_id']))
 
     conn.commit()
+    cur.close()
     conn.close()
 
     return redirect('/my_bookings')
 
+
+# ---------------- ADMIN ----------------
 @app.route('/admin')
 def admin_dashboard():
 
     conn = get_db_connection()
+    cur = conn.cursor()
 
-    total_bookings = conn.execute("SELECT COUNT(*) FROM bookings").fetchone()[0]
-    active = conn.execute("SELECT COUNT(*) FROM bookings WHERE status='booked'").fetchone()[0]
-    cancelled = conn.execute("SELECT COUNT(*) FROM bookings WHERE status='cancelled'").fetchone()[0]
+    cur.execute("SELECT COUNT(*) FROM bookings")
+    total = cur.fetchone()[0]
 
+    cur.execute("SELECT COUNT(*) FROM bookings WHERE status='booked'")
+    active = cur.fetchone()[0]
+
+    cur.execute("SELECT COUNT(*) FROM bookings WHERE status='cancelled'")
+    cancelled = cur.fetchone()[0]
+
+    cur.close()
     conn.close()
 
     return render_template('admin.html',
-                           total=total_bookings,
+                           total=total,
                            active=active,
                            cancelled=cancelled)
-    
+
+
+# ---------------- SLOTS ----------------
 @app.route('/slots')
 def view_slots():
 
     conn = get_db_connection()
+    cur = conn.cursor()
 
-    slots = conn.execute("""
+    cur.execute("""
     SELECT s.id, s.vehicle_type_id,
     CASE 
         WHEN s.id IN (SELECT slot_id FROM bookings WHERE status='booked')
         THEN 'Occupied'
         ELSE 'Available'
-    END as status
+    END
     FROM slots s
-    """).fetchall()
+    """)
 
+    slots = cur.fetchall()
+
+    cur.close()
     conn.close()
 
-    return render_template('slots.html', slots=slots)        
+    return render_template('slots.html', slots=slots)
 
-# ---------------- RUN APP ----------------
-if __name__ == '__main__':
-    app.run(debug=True, port=5001)
+
+# ---------------- RUN ----------------
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=10000)
