@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Parking Slots</title>
+    <style>
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 10px;
+            padding: 20px;
+        }
+
+        .slot {
+            padding: 20px;
+            text-align: center;
+            color: white;
+            font-weight: bold;
+        }
+
+        .available { background: green; }
+        .occupied { background: red; }
+    </style>
+</head>
+
+<body>
+
+<h2 style="text-align:center;">🅿️ Parking Slots</h2>
+
+<div class="grid">
+    {% for s in slots %}
+        <div class="slot {% if s.status=='Available' %}available{% else %}occupied{% endif %}">
+            Slot {{ s.id }} <br>
+            {{ s.status }}
+        </div>
+    {% endfor %}
+</div>
+
+</body>
+</html>
