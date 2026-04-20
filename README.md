@@ -58,7 +58,7 @@ pip install -r requirements.txt
 ### Run application
 python app.py
 
-## Cloud Deployment (Render / Railway / AWS)
+## Cloud Deployment (Render)
 ### Steps for Deployment:
 1)Push project to GitHub.
 
