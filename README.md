@@ -6,7 +6,16 @@ A full-stack web-based application designed to efficiently manage parking spaces
 The Smart Parking Management System is a production-style full-stack web application designed to automate parking operations using real-time slot tracking, booking management, and billing automation.
 It simulates a real-world intelligent parking ecosystem, demonstrating strong skills in:
 
-System Design
-Backend Engineering
-Database Architecture
-Full-stack Web Development
+- System Design
+- Backend Engineering
+- Database Architecture
+- Full-stack Web Development
+## Key Highlights
+-  Real-time parking slot allocation
+-  Secure authentication system
+-  Admin-controlled monitoring dashboard
+-  Automated entry/exit tracking
+-  Dynamic billing system
+-  Fully responsive UI
+
+## System Architecture
