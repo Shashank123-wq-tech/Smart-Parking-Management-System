@@ -19,3 +19,5 @@ It simulates a real-world intelligent parking ecosystem, demonstrating strong sk
 -  Fully responsive UI
 
 ## System Architecture
+![System Architecture](https://github.com/Shashank123-wq-tech/Smart-Parking-Management-System/blob/main/mermaid-diagram.png)
+
