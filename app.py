@@ -15,7 +15,6 @@ def index():
     conn = get_db_connection()
     cur = conn.cursor()
 
-    # Fetch vehicle types with price
     cur.execute("SELECT id, name, price_per_hour FROM vehicle_types")
     vehicle_types = cur.fetchall()
 
@@ -36,7 +35,6 @@ def register():
         conn = get_db_connection()
         cur = conn.cursor()
 
-        # Check duplicate email
         cur.execute("SELECT * FROM users WHERE email = %s", (email,))
         if cur.fetchone():
             cur.close()
@@ -100,9 +98,15 @@ def book():
     if 'user_id' not in session:
         return redirect('/login')
 
+    if not request.form['vehicle_type']:
+        return "❌ Please select vehicle type"
+
     vehicle_type = int(request.form['vehicle_type'])
     start_time = request.form['start_time']
     end_time = request.form['end_time']
+
+    if not start_time or not end_time:
+        return "❌ Please select time properly"
 
     # Convert time
     fmt = "%Y-%m-%dT%H:%M"
@@ -139,16 +143,25 @@ def book():
 
     slot_id = slot[0]
 
-    # Get price
+    # 💰 Get price (FIXED)
     cur.execute(
         "SELECT price_per_hour FROM vehicle_types WHERE id = %s",
         (vehicle_type,)
     )
-    price = cur.fetchone()[0]
 
+    result = cur.fetchone()
+
+    if not result:
+        cur.close()
+        conn.close()
+        return "❌ Price not found for selected vehicle"
+
+    price = result[0]
+
+    # 💰 Calculate total
     total_amount = round(hours * price, 2)
 
-    # Insert booking
+    # 💾 Insert booking
     cur.execute("""
     INSERT INTO bookings 
     (user_id, slot_id, start_time, end_time, total_amount, status)
@@ -223,7 +236,7 @@ def cancel_booking(booking_id):
     return redirect('/my_bookings')
 
 
-# ---------------- ADMIN DASHBOARD ----------------
+# ---------------- ADMIN ----------------
 @app.route('/admin')
 def admin_dashboard():
 
@@ -252,7 +265,7 @@ def admin_dashboard():
                            revenue=revenue)
 
 
-# ---------------- VIEW SLOTS ----------------
+# ---------------- SLOTS ----------------
 @app.route('/slots')
 def view_slots():
 
