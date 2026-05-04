@@ -7,12 +7,16 @@ def get_db_connection():
     if not db_url:
         raise Exception("DATABASE_URL not set")
 
-    return psycopg2.connect(db_url)
+    return psycopg2.connect(db_url, sslmode='require')
 
 
 def init_db():
     conn = get_db_connection()
     cur = conn.cursor()
+    cur.execute("DROP TABLE IF EXISTS bookings CASCADE;")
+    cur.execute("DROP TABLE IF EXISTS slots CASCADE;")
+    cur.execute("DROP TABLE IF EXISTS vehicle_types CASCADE;")
+    cur.execute("DROP TABLE IF EXISTS users CASCADE;")
 
     # USERS
     cur.execute("""
@@ -24,11 +28,11 @@ def init_db():
     )
     """)
 
-    # VEHICLE TYPES
+    # VEHICLE TYPES (✅ FIXED COLUMN NAME)
     cur.execute("""
     CREATE TABLE IF NOT EXISTS vehicle_types (
         id SERIAL PRIMARY KEY,
-        type_name TEXT,
+        name TEXT,
         price_per_hour INTEGER
     )
     """)
@@ -54,14 +58,15 @@ def init_db():
     )
     """)
 
-    # 🔥 INSERT DEFAULT DATA
+    # INSERT DEFAULT VEHICLES
     cur.execute("SELECT COUNT(*) FROM vehicle_types")
     if cur.fetchone()[0] == 0:
-        cur.execute("INSERT INTO vehicle_types VALUES (DEFAULT, %s, %s)", ("Car", 50))
-        cur.execute("INSERT INTO vehicle_types VALUES (DEFAULT, %s, %s)", ("Bike", 20))
-        cur.execute("INSERT INTO vehicle_types VALUES (DEFAULT, %s, %s)", ("Truck", 100))
-        cur.execute("INSERT INTO vehicle_types VALUES (DEFAULT, %s, %s)", ("Van", 70))
+        cur.execute("INSERT INTO vehicle_types (name, price_per_hour) VALUES (%s, %s)", ("Car", 50))
+        cur.execute("INSERT INTO vehicle_types (name, price_per_hour) VALUES (%s, %s)", ("Bike", 20))
+        cur.execute("INSERT INTO vehicle_types (name, price_per_hour) VALUES (%s, %s)", ("Truck", 100))
+        cur.execute("INSERT INTO vehicle_types (name, price_per_hour) VALUES (%s, %s)", ("Van", 70))
 
+    # INSERT SLOTS
     cur.execute("SELECT COUNT(*) FROM slots")
     if cur.fetchone()[0] == 0:
         for _ in range(5):
@@ -72,3 +77,4 @@ def init_db():
     conn.commit()
     cur.close()
     conn.close()
+    
