@@ -67,7 +67,7 @@ python app.py
 3) Set environment variables.
 
 4) Add start command:(gunicorn app:app). 
-5) Deploy and get live URL: https://smart-parking-management-system-1-y2mi.onrender.com
+5) Deploy and get live URL: https://smart-parking-management-system-2.onrender.com
 
 ## UI Preview :
 ### Home Page
