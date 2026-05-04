@@ -15,7 +15,8 @@ def index():
     conn = get_db_connection()
     cur = conn.cursor()
 
-    cur.execute("SELECT * FROM vehicle_types")
+    # Fetch vehicle types with price
+    cur.execute("SELECT id, name, price_per_hour FROM vehicle_types")
     vehicle_types = cur.fetchall()
 
     cur.close()
@@ -35,11 +36,9 @@ def register():
         conn = get_db_connection()
         cur = conn.cursor()
 
-        # ✅ Check duplicate email
+        # Check duplicate email
         cur.execute("SELECT * FROM users WHERE email = %s", (email,))
-        existing = cur.fetchone()
-
-        if existing:
+        if cur.fetchone():
             cur.close()
             conn.close()
             return "❌ Email already exists"
@@ -79,7 +78,7 @@ def login():
         conn.close()
 
         if user:
-            session['user_id'] = user[0]   # id is index 0
+            session['user_id'] = user[0]
             return redirect('/')
         else:
             return "❌ Invalid credentials"
@@ -105,19 +104,31 @@ def book():
     start_time = request.form['start_time']
     end_time = request.form['end_time']
 
+    # Convert time
+    fmt = "%Y-%m-%dT%H:%M"
+    start = datetime.strptime(start_time, fmt)
+    end = datetime.strptime(end_time, fmt)
+
+    # Validate time
+    if end <= start:
+        return "❌ End time must be greater than start time"
+
+    hours = (end - start).total_seconds() / 3600
+
     conn = get_db_connection()
     cur = conn.cursor()
 
-    # 🔥 Check available slot (no conflict)
+    # Find available slot
     cur.execute("""
     SELECT * FROM slots 
     WHERE vehicle_type_id = %s
     AND id NOT IN (
         SELECT slot_id FROM bookings
-        WHERE (start_time < %s AND end_time > %s)
+        WHERE status = 'booked'
+        AND (start_time < %s AND end_time > %s)
     )
     LIMIT 1
-    """, (vehicle_type, end_time, start_time))
+    """, (vehicle_type, end, start))
 
     slot = cur.fetchone()
 
@@ -128,26 +139,16 @@ def book():
 
     slot_id = slot[0]
 
-    # 🧮 Calculate duration
-    fmt = "%Y-%m-%dT%H:%M"
-    start = datetime.strptime(start_time, fmt)
-    end = datetime.strptime(end_time, fmt)
-
-    hours = (end - start).total_seconds() / 3600
-
-    if hours <= 0:
-        return "❌ Invalid time selection"
-
-    # 💰 Get price
+    # Get price
     cur.execute(
         "SELECT price_per_hour FROM vehicle_types WHERE id = %s",
         (vehicle_type,)
     )
     price = cur.fetchone()[0]
 
-    total_amount = hours * price
+    total_amount = round(hours * price, 2)
 
-    # 💾 Insert booking
+    # Insert booking
     cur.execute("""
     INSERT INTO bookings 
     (user_id, slot_id, start_time, end_time, total_amount, status)
@@ -222,7 +223,7 @@ def cancel_booking(booking_id):
     return redirect('/my_bookings')
 
 
-# ---------------- ADMIN ----------------
+# ---------------- ADMIN DASHBOARD ----------------
 @app.route('/admin')
 def admin_dashboard():
 
@@ -238,16 +239,20 @@ def admin_dashboard():
     cur.execute("SELECT COUNT(*) FROM bookings WHERE status='cancelled'")
     cancelled = cur.fetchone()[0]
 
+    cur.execute("SELECT COALESCE(SUM(total_amount),0) FROM bookings")
+    revenue = cur.fetchone()[0]
+
     cur.close()
     conn.close()
 
     return render_template('admin.html',
                            total=total,
                            active=active,
-                           cancelled=cancelled)
+                           cancelled=cancelled,
+                           revenue=revenue)
 
 
-# ---------------- SLOTS ----------------
+# ---------------- VIEW SLOTS ----------------
 @app.route('/slots')
 def view_slots():
 
@@ -274,4 +279,4 @@ def view_slots():
 
 # ---------------- RUN ----------------
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000)
+    app.run(host="0.0.0.0", port=10000, debug=True)

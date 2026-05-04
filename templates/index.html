@@ -11,41 +11,18 @@
             padding: 20px;
         }
 
-        h1 {
-            color: #333;
-        }
-
-        .container {
+        .container-box {
             background: white;
             padding: 20px;
             border-radius: 10px;
-            width: 400px;
+            width: 450px;
             margin: auto;
             box-shadow: 0 0 10px rgba(0,0,0,0.1);
         }
 
-        input, select {
-            width: 100%;
-            padding: 8px;
-            margin: 8px 0;
-        }
-
-        button {
-            background: #28a745;
-            color: white;
-            border: none;
-            padding: 10px;
-            width: 100%;
-            cursor: pointer;
-        }
-
-        button:hover {
-            background: #218838;
-        }
-
         .nav {
-            margin-bottom: 20px;
             text-align: center;
+            margin-bottom: 20px;
         }
 
         .nav a {
@@ -53,125 +30,117 @@
             text-decoration: none;
             color: blue;
         }
-
-        .info {
-            text-align: center;
-            margin-bottom: 15px;
-        }
     </style>
 </head>
 
 <body>
 
-    <!-- Navigation -->
-    <div class="nav">
-        <a href="/">Home</a>
+<!-- Navigation -->
+<div class="nav">
+    <a href="/">Home</a>
 
-        {% if session.get('user_id') %}
-            <a href="/my_bookings">My Bookings</a>
-            <a href="/logout">Logout</a>
-        {% else %}
-            <a href="/login">Login</a>
-            <a href="/register">Register</a>
-        {% endif %}
-    </div>
-
-    <h1 style="text-align:center;">🚗 Smart Parking Management System</h1>
-
-    <div class="container">
-
-        {% if session.get('user_id') %}
-            <div class="info">
-                <strong>Welcome! Book your parking slot</strong>
-            </div>
-
-            <!-- BOOKING FORM -->
-            <div class="container mt-5">
-    <div class="card p-4 shadow">
-
-        <h3 class="text-center">🚗 Book Parking</h3>
-
-        <form method="POST" action="/book">
-
-            <div class="mb-3">
-                <label class="form-label">Vehicle Type</label>
-                <select name="vehicle_type" required>
-                  <option value="">Select Vehicle</option>
-                  <option value="1">Car</option>
-                 <option value="2">Bike</option>
-                 <option value="3">Truck</option>
-                </select>
-            </div>
-            <div class="mt-3">
-               <h4>💰 Estimated Amount: ₹<span id="amount">0</span></h4>
-            </div>
-
-            <div class="mb-3">
-                <label class="form-label">Start Time</label>
-                <input type="datetime-local" name="start_time" class="form-control" required>
-            </div>
-
-            <div class="mb-3">
-                <label class="form-label">End Time</label>
-                <input type="datetime-local" name="end_time" class="form-control" required>
-            </div>
-
-            <button class="btn btn-primary w-100">🚀 Book Now</button>
-
-        </form>
-
-    </div>
+    {% if session.get('user_id') %}
+        <a href="/my_bookings">My Bookings</a>
+        <a href="/logout">Logout</a>
+    {% else %}
+        <a href="/login">Login</a>
+        <a href="/register">Register</a>
+    {% endif %}
 </div>
 
-        {% else %}
-            <div class="info">
-                <p>Please <a href="/login">Login</a> to book parking</p>
-            </div>
-        {% endif %}
+<h2 class="text-center">🚗 Smart Parking Management System</h2>
 
-    </div>
+<div class="container-box">
 
-    <br>
+{% if session.get('user_id') %}
 
-    <!-- INFO SECTION -->
-    <div class="container">
-        <h3>📌 Parking Info</h3>
-        <ul>
-            <li>✔ Different pricing for each vehicle type</li>
-            <li>✔ Time-based slot booking</li>
-            <li>✔ No double booking allowed</li>
-            <li>✔ Real-time availability check</li>
-        </ul>
-    </div>
+    <h4 class="text-center mb-3">🚗 Book Parking</h4>
 
-    <script>
-      function calculateAmount() {
+    <form method="POST" action="/book">
 
-      let vehicle = document.getElementById("vehicle_type");
-      let price = vehicle.options[vehicle.selectedIndex].getAttribute("data-price");
+        <!-- Vehicle Type -->
+        <label>Vehicle Type</label>
+        <select name="vehicle_type" id="vehicle_type" class="form-control" required>
+            <option value="">Select Vehicle</option>
 
-      let start = document.querySelector("input[name='start_time']").value;
-      let end = document.querySelector("input[name='end_time']").value;
+            {% for v in vehicle_types %}
+                <option value="{{ v[0] }}" data-price="{{ v[2] }}">
+                    {{ v[1] }} (₹{{ v[2] }}/hr)
+                </option>
+            {% endfor %}
+        </select>
 
-      if (start && end) {
+        <!-- Estimated Amount -->
+        <div class="mt-3">
+            <h5>💰 Estimated Amount: ₹<span id="amount">0</span></h5>
+        </div>
+
+        <!-- Start Time -->
+        <label>Start Time</label>
+        <input type="datetime-local" name="start_time" id="start_time" class="form-control" required>
+
+        <!-- End Time -->
+        <label>End Time</label>
+        <input type="datetime-local" name="end_time" id="end_time" class="form-control" required>
+
+        <br>
+        <button class="btn btn-primary w-100">🚀 Book Now</button>
+
+    </form>
+
+{% else %}
+    <p class="text-center">Please <a href="/login">Login</a> to book parking</p>
+{% endif %}
+
+</div>
+
+<br>
+
+<!-- Info -->
+<div class="container-box">
+    <h4>📌 Parking Info</h4>
+    <ul>
+        <li>✔ Different pricing for each vehicle type</li>
+        <li>✔ Time-based slot booking</li>
+        <li>✔ No double booking allowed</li>
+        <li>✔ Real-time availability check</li>
+    </ul>
+</div>
+
+<!-- 🔥 JavaScript FIX -->
+<script>
+function calculateAmount() {
+    let vehicle = document.getElementById("vehicle_type");
+
+    if (!vehicle.value) {
+        document.getElementById("amount").innerText = "0";
+        return;
+    }
+
+    let price = vehicle.options[vehicle.selectedIndex].getAttribute("data-price");
+
+    let start = document.getElementById("start_time").value;
+    let end = document.getElementById("end_time").value;
+
+    if (start && end && price) {
         let startTime = new Date(start);
         let endTime = new Date(end);
 
         let hours = (endTime - startTime) / (1000 * 60 * 60);
 
         if (hours > 0) {
-            let amount = hours * price;
-            document.getElementById("amount").innerText = amount.toFixed(2);
+            let total = hours * price;
+            document.getElementById("amount").innerText = total.toFixed(2);
         } else {
             document.getElementById("amount").innerText = "0";
         }
     }
 }
 
-//  Trigger on change
-      document.getElementById("vehicle_type").addEventListener("change", calculateAmount);
-      document.querySelector("input[name='start_time']").addEventListener("change", calculateAmount);
-      document.querySelector("input[name='end_time']").addEventListener("change", calculateAmount);
+/* Trigger Events */
+document.getElementById("vehicle_type").addEventListener("change", calculateAmount);
+document.getElementById("start_time").addEventListener("change", calculateAmount);
+document.getElementById("end_time").addEventListener("change", calculateAmount);
 </script>
 
 </body>
